@@ -1,3 +1,4 @@
+package com.levelup.backendapi.model;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
