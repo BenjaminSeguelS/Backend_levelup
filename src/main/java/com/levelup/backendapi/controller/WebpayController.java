@@ -1,7 +1,6 @@
 package com.levelup.backendapi.controller;
 
-// --- 1. AQUÍ ESTABA EL ERROR: Faltaba importar IntegrationApiKeys ---
-import cl.transbank.common.IntegrationApiKeys; 
+import cl.transbank.common.IntegrationApiKeys;
 import cl.transbank.common.IntegrationCommerceCodes;
 import cl.transbank.common.IntegrationType;
 import cl.transbank.webpay.common.WebpayOptions;
@@ -26,11 +25,9 @@ public class WebpayController {
         String buyOrder = "orden-" + new Random().nextInt(100000);
         String sessionId = "session-" + new Random().nextInt(100000);
         
-        // URL donde Transbank devolverá al usuario (Backend)
         String returnUrl = "http://localhost:8080/api/webpay/commit"; 
 
         try {
-            // Ahora "IntegrationApiKeys" funcionará porque ya está importado arriba
             WebpayPlus.Transaction tx = new WebpayPlus.Transaction(new WebpayOptions(
                 IntegrationCommerceCodes.WEBPAY_PLUS, 
                 IntegrationApiKeys.WEBPAY, 
@@ -45,11 +42,27 @@ public class WebpayController {
         }
     }
 
-    // 2. CONFIRMAR PAGO
-    // Aceptamos POST (lo que usa Transbank) y GET (por si acaso)
+    // 2. CONFIRMAR PAGO (Maneja Éxito, Rechazo y Anulación)
     @RequestMapping(value = "/commit", method = {RequestMethod.GET, RequestMethod.POST})
-    public RedirectView commitTransaction(@RequestParam("token_ws") String tokenWs) {
+    public RedirectView commitTransaction(
+            @RequestParam(value = "token_ws", required = false) String tokenWs,
+            @RequestParam(value = "TBK_TOKEN", required = false) String tbkToken,
+            @RequestParam(value = "TBK_ORDEN_COMPRA", required = false) String tbkOrdenCompra,
+            @RequestParam(value = "TBK_ID_SESION", required = false) String tbkIdSesion) {
+        
         try {
+            // CASO 1: PAGO ANULADO (Usuario presionó "Anular" en el formulario Webpay)
+            if (tokenWs == null && tbkToken != null) {
+                // Redirigir DIRECTAMENTE a productos como pediste
+                return new RedirectView("http://localhost:3000/productos");
+            }
+
+            // CASO 2: ERROR GENÉRICO (Ni token_ws ni tbkToken)
+            if (tokenWs == null) {
+                return new RedirectView("http://localhost:3000/compra-exitosa?status=error");
+            }
+
+            // CASO 3: FLUJO NORMAL (Confirmar transacción)
             WebpayPlus.Transaction tx = new WebpayPlus.Transaction(new WebpayOptions(
                 IntegrationCommerceCodes.WEBPAY_PLUS, 
                 IntegrationApiKeys.WEBPAY, 
@@ -63,6 +76,7 @@ public class WebpayController {
             } else {
                 return new RedirectView("http://localhost:3000/compra-exitosa?status=rejected");
             }
+
         } catch (Exception e) {
             e.printStackTrace();
             return new RedirectView("http://localhost:3000/compra-exitosa?status=error");
