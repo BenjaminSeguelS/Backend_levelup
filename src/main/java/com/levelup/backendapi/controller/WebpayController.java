@@ -18,6 +18,8 @@ import java.util.Random;
 @CrossOrigin(origins = "*")
 public class WebpayController {
 
+    // CAMBIO IMPORTANTE: Tu IP pública
+private static final String BASE_URL = "http://52.2.45.72";
     // 1. INICIAR PAGO
     @PostMapping("/create")
     public WebpayPlusTransactionCreateResponse startPayment(@RequestBody Map<String, Object> payload) {
@@ -25,7 +27,8 @@ public class WebpayController {
         String buyOrder = "orden-" + new Random().nextInt(100000);
         String sessionId = "session-" + new Random().nextInt(100000);
         
-        String returnUrl = "http://localhost:8080/api/webpay/commit"; 
+        // CORREGIDO: URL de retorno apunta a tu IP pública (Nginx maneja el /api)
+        String returnUrl = BASE_URL + "/api/webpay/commit"; 
 
         try {
             WebpayPlus.Transaction tx = new WebpayPlus.Transaction(new WebpayOptions(
@@ -42,27 +45,10 @@ public class WebpayController {
         }
     }
 
-    // 2. CONFIRMAR PAGO (Maneja Éxito, Rechazo y Anulación)
+    // 2. CONFIRMAR PAGO
     @RequestMapping(value = "/commit", method = {RequestMethod.GET, RequestMethod.POST})
-    public RedirectView commitTransaction(
-            @RequestParam(value = "token_ws", required = false) String tokenWs,
-            @RequestParam(value = "TBK_TOKEN", required = false) String tbkToken,
-            @RequestParam(value = "TBK_ORDEN_COMPRA", required = false) String tbkOrdenCompra,
-            @RequestParam(value = "TBK_ID_SESION", required = false) String tbkIdSesion) {
-        
+    public RedirectView commitTransaction(@RequestParam("token_ws") String tokenWs) {
         try {
-            // CASO 1: PAGO ANULADO (Usuario presionó "Anular" en el formulario Webpay)
-            if (tokenWs == null && tbkToken != null) {
-                // Redirigir DIRECTAMENTE a productos como pediste
-                return new RedirectView("http://localhost:3000/productos");
-            }
-
-            // CASO 2: ERROR GENÉRICO (Ni token_ws ni tbkToken)
-            if (tokenWs == null) {
-                return new RedirectView("http://localhost:3000/compra-exitosa?status=error");
-            }
-
-            // CASO 3: FLUJO NORMAL (Confirmar transacción)
             WebpayPlus.Transaction tx = new WebpayPlus.Transaction(new WebpayOptions(
                 IntegrationCommerceCodes.WEBPAY_PLUS, 
                 IntegrationApiKeys.WEBPAY, 
@@ -71,15 +57,15 @@ public class WebpayController {
 
             WebpayPlusTransactionCommitResponse response = tx.commit(tokenWs);
 
+            // CORREGIDO: Redirigir al Frontend en producción (puerto 80, no 3000)
             if (response.getStatus().equals("AUTHORIZED")) {
-                return new RedirectView("http://localhost:3000/compra-exitosa?status=success");
+                return new RedirectView(BASE_URL + "/compra-exitosa?status=success");
             } else {
-                return new RedirectView("http://localhost:3000/compra-exitosa?status=rejected");
+                return new RedirectView(BASE_URL + "/compra-exitosa?status=rejected");
             }
-
         } catch (Exception e) {
             e.printStackTrace();
-            return new RedirectView("http://localhost:3000/compra-exitosa?status=error");
+            return new RedirectView(BASE_URL + "/compra-exitosa?status=error");
         }
     }
 }
